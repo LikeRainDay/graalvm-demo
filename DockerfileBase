@@ -1,0 +1,54 @@
+FROM centos:7
+
+USER root
+
+ENV JAVA_HOME=/root/.sdkman/candidates/java/current \
+    PATH=/root/.sdkman/candidates/java/current/bin:$PATH
+
+RUN \
+    yum install gcc unzip zip wget zlib-devel -y \
+    && curl -s "https://get.sdkman.io" | bash \
+    && source "$HOME/.sdkman/bin/sdkman-init.sh" \
+    && sdk install java 17.0.11-graal \
+    && export JAVA_HOME=/$HOME/.sdkman/candidates/java/current \
+    && java --version
+
+CMD ["gradle"]
+
+ENV GRADLE_HOME /opt/gradle
+
+RUN set -o errexit -o nounset \
+    && echo "Adding gradle user and group" \
+    && mkdir -p /home/gradle/.gradle \
+    && chmod -R o+rwx /home/gradle \
+    \
+    && echo "Symlinking root Gradle cache to gradle Gradle cache" \
+    && ln -s /home/gradle/.gradle /root/.gradle
+
+VOLUME /home/gradle/.gradle
+
+WORKDIR /home/gradle
+
+ENV GRADLE_VERSION 8.7
+ARG GRADLE_DOWNLOAD_SHA256=544c35d6bd849ae8a5ed0bcea39ba677dc40f49df7d1835561582da2009b961d
+RUN set -o errexit -o nounset \
+    && echo "Downloading Gradle" \
+    && wget --no-verbose --output-document=gradle.zip "https://services.gradle.org/distributions/gradle-${GRADLE_VERSION}-bin.zip" \
+    \
+    && echo "Checking Gradle download hash" \
+    && echo "${GRADLE_DOWNLOAD_SHA256} *gradle.zip" | sha256sum -c - \
+    \
+    && echo "Installing Gradle" \
+    && unzip gradle.zip \
+    && rm gradle.zip \
+    && mv "gradle-${GRADLE_VERSION}" "${GRADLE_HOME}/" \
+    && ln -s "${GRADLE_HOME}/bin/gradle" /usr/bin/gradle
+
+
+RUN set -o errexit -o nounset \
+    && echo "Testing Gradle installation" \
+    && gradle --version \
+    && java --version
+
+
+
